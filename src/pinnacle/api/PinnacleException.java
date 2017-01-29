@@ -4,51 +4,66 @@ import java.io.IOException;
 
 /**
  * A Exception thrown by this package.
- * @author gentoku@gmail.com
- *
  */
 @SuppressWarnings("serial")
 public class PinnacleException extends IOException {
-	
-	PinnacleException (String message) {
-		super(message);
-	}
-	
-	/*
-	 * Runtime Exceptions
-	 * 
-	 * Why not integrated as a single exception? Or why runtime exception?
-	 * To use with Stream API. Checked exceptions can't be thrown in lambda function
-	 * while runtime exceptions can be done. Specification of Java.
-	 */
-	/**
-	 * This exception is thrown when mapping a response to an object 
-	 * if JSON or XML document doesn't have a key Pinnacle Sports defined 
-	 * as 'required' or 'not optional'.
-	 */
-	public static class NoNecessaryKeyException extends RuntimeException {
-		
-		private NoNecessaryKeyException (String message) {
-			super(message);
-		}
-		
-		static NoNecessaryKeyException of (String key) {
-			return new NoNecessaryKeyException("Necessary key not found in JSON/XML: " + key);
-		}
+
+	enum TYPE {
+		CONNECTION_FAILED, ERROR_RETURNED, PARAMETER_INVALID, JSON_UNPARSABLE;
 	}
 
-	/**
-	 * This exception is thrown when a value of Enum in a response is not
-	 * enumerated in the list Pinnacle Sports defined.
+	private TYPE errorType;
+
+	public TYPE errorType() {
+		return this.errorType;
+	}
+
+	private String errorJson;
+
+	public String errorJson() {
+		return this.errorJson;
+	}
+
+	/*
+	 * public GenericException parsedErrorJson () throws PinnacleException {
+	 * return GenericException.parse(this.errorJson); }
 	 */
-	public static class NoEnumException extends RuntimeException {
-		
-		private NoEnumException (String message) {
-			super(message);
-		}
-		
-		static NoEnumException of (String enumName, String value) {
-			return new NoEnumException("No [" + enumName + "] exists for the value of:" + value);
-		}
+	private int statusCode;
+
+	public int statusCode() {
+		return this.statusCode;
+	}
+
+	private String unparsableJson;
+
+	public String unparsableJson() {
+		return this.unparsableJson;
+	}
+
+	private PinnacleException(String message, TYPE errorType) {
+		super(message);
+		this.errorType = errorType;
+	}
+
+	static PinnacleException connectionFailed(String message) {
+		return new PinnacleException(message, TYPE.CONNECTION_FAILED);
+	}
+
+	static PinnacleException errorReturned(int statusCode, String errorJson) {
+		PinnacleException ex = new PinnacleException("API returned an error response:[" + statusCode + "] " + errorJson,
+				TYPE.ERROR_RETURNED);
+		ex.statusCode = statusCode;
+		ex.errorJson = errorJson;
+		return ex;
+	}
+
+	static PinnacleException parameterInvalid(String message) {
+		return new PinnacleException(message, TYPE.PARAMETER_INVALID);
+	}
+
+	static PinnacleException jsonUnparsable(String unparsableJson) {
+		PinnacleException ex = new PinnacleException("Couldn't parse JSON: " + unparsableJson, TYPE.JSON_UNPARSABLE);
+		ex.unparsableJson = unparsableJson;
+		return ex;
 	}
 }

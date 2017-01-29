@@ -1,512 +1,589 @@
 package pinnacle.api;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import com.google.gson.Gson;
+import pinnacle.api.enums.BETLIST_TYPE;
+import pinnacle.api.enums.BET_TYPE;
+import pinnacle.api.enums.CULTURE_CODE;
+import pinnacle.api.enums.LEG_BET_TYPE;
+import pinnacle.api.enums.ODDS_FORMAT;
+import pinnacle.api.enums.PERIOD;
+import pinnacle.api.enums.ROUND_ROBIN_OPTIONS;
+import pinnacle.api.enums.SIDE_TYPE;
+import pinnacle.api.enums.TEAM_TYPE;
+import pinnacle.api.enums.WIN_RISK_TYPE;
 
-import pinnacle.api.Enums.*;
+public class Parameter extends ParameterCore {
 
-public class Parameter {
-	
-	private Map<String, Object> parameters;
-	
 	/**
-	 * The parameter has 'last' to determine throttling rate for fair use. 
-	 */
-	@Deprecated // only for 'feed' request, which is obsolete.
-	private boolean hasLast = false;
-	@Deprecated // only for 'feed' request, which is obsolete.
-	boolean hasLast () {
-		return this.hasLast;
-	}
-	
-	/**
-	 * legs will be set as array of parameter object.
-	 */
-	private List<Parameter> legs;
-	
-	/**
-	 * Returns legs. This should be used when the parameter must have 'legs'
-	 * so throws exception when legs is null. 
-	 * @return
-	 */
-	List<Parameter> legs () {
-		if (this.legs == null) throw new IllegalArgumentException("legs must be set in parameters.");
-		return this.legs;
-	}
-	
-	/**
-	 * Constructor and Factory.
+	 * Constructor.
 	 */
 	private Parameter () {
-		this.parameters = new ConcurrentHashMap<>(); // to lower-case key names by stream
-		this.legs = new ArrayList<>();
+		super();
 	}
-	public static Parameter newInstance () {
+	
+	/**
+	 * Factory
+	 * 
+	 * @return
+	 */
+	public static Parameter newInstance() {
 		return new Parameter();
 	}
-	
+
+
 	/**
-	 * Unites key and value with '=' and joins them with '&' for GET method request.
-	 * Not support nested parameters like legs.
-	 * @return
-	 */
-	String get () {
-		return this.parameters.entrySet()
-				.parallelStream()
-				.map(p -> p.getKey() + "=" + p.getValue().toString())
-				.collect(Collectors.joining("&"));
-	}
-	
-	/**
-	 * Converts parameters to Json. This is currently just for POST method request
-	 * related with Parlay Bet.   
-	 * @return
-	 */
-	String json () {
-		if (this.legs.size() > 0) {
-			List<Map<String, Object>> list = this.legs.parallelStream()
-												.map(leg -> leg.parameters)
-												.collect(Collectors.toList());
-			this.parameters.put("legs", list);
-		}
-		Gson gson = new Gson();
-		return gson.toJson(this.parameters);
-	}
-	
-	/**
-	 * Changes camel case of keys into lower case.
+	 * ID of the target sports.
 	 * 
-	 * Pinnaclesports.com defines every name of parameters as 'camelCase' by default,
-	 * but 'Get League' operation uses not 'sportId' but 'sportid' in request URL.
-	 * This is for such a awkward case.  
-	 */
-	void toLowerCase () {
-		this.parameters.keySet().forEach(this::renameKey);
-	}
-	
-	private void renameKey (String key) {
-		Object value = this.parameters.remove(key);
-		this.parameters.put(key.toLowerCase(), value);
-	}
-	
-	/**
-	 * Returns <code>Validator</code> to validate and verify.  
-	 * @return
-	 */
-	Validator getValidator () {
-		return new Validator(this.parameters);
-	}
-	
-	/**
-	 * (Integer)
-	 * The id of target sport. 
 	 * @param id
 	 */
-	public void sportId (int id) {
-		this.parameters.put("sportId", Integer.valueOf(id));
-	}
-	
-	/**
-	 * (Integer)
-	 * The league id that belongs to the same sport Id. If sportid/leagueid
-	 * is an invalid pair, no results will be returned. 
-	 * @param id
-	 */
-	public void leagueId (int id) {
-		this.parameters.put("leagueId", Integer.toString(id));
+	public void sportId(int id) {
+		this.parameters.put("sportId", id);
 	}
 
 	/**
-	 * (String) 
-	 * You can also pass multiple leagues separated by a dash "-" for 'Get Feed' request. 
-	 * @param ids
-	 * @return
-	 */
-	@Deprecated // only for 'feed' which is obsolete. (Actually valid for get fixtures but leagueIds should be used.)
-	public void leagueId (int... ids) {
-		String leagueIds = IntStream.of(ids)
-							.mapToObj(Integer::toString)
-							.collect(Collectors.joining("-"));
-		this.parameters.put("leagueId", leagueIds);
-		this.parameters.put("multipleLeagueId", "here"); // no mean for 'here', just not to be null.
-	}
-	
-	/**
-	 * (Array/Comma separated String) 
 	 * The leagueIds array may contain a list of comma separated league ids.
+	 * 
 	 * @param ids
 	 * @return
 	 */
-	public void leagueIds (int... ids) {
-		String leagueIds = IntStream.of(ids)
-							.mapToObj(Integer::toString)
-							.collect(Collectors.joining(","));
+	public void leagueIds(long... ids) {
+		String leagueIds = LongStream.of(ids).mapToObj(Long::toString).collect(Collectors.joining(","));
 		this.parameters.put("leagueIds", leagueIds);
 	}
-	
+
 	/**
-	 * (Integer)
-	 * The id of the event.
-	 * @param id
+	 * This accepts a single leagueId.
+	 * 
+	 * @param ids
+	 * @return
 	 */
-	public void eventId (int id) {
-		this.parameters.put("eventId", Integer.valueOf(id));
+	public void leagueId(long id) {
+		this.parameters.put("leagueId", id);
 	}
 
 	/**
-	 * (Long)
-	 * This is used to receive incremental updates. Use the value of last 
-	 * from previous fixtures response. When since parameter is not provided, 
-	 * the fixtures are delayed up to 1 min to encourage the use of the parameter.
+	 * This is used to receive incremental updates. Use the value of last from
+	 * previous fixtures response. When since parameter is not provided, the
+	 * fixtures are delayed up to 1 min to encourage the use of the parameter.
 	 * 
-	 * Please note that when using since parameter to get odds you will get 
-	 * in the response ONLY changed periods. If a period didn’t have any changes 
-	 * it will not be in the response.
+	 * Please note that when using since parameter to get odds you will get in
+	 * the response ONLY changed periods. If a period didn’t have any changes it
+	 * will not be in the response.
+	 * 
 	 * @param since
 	 * @return
 	 */
-	public void since (long since) {
-		this.parameters.put("since", Long.valueOf(since));
+	public void since(long since) {
+		this.parameters.put("since", since);
+		this.withSince = true;
 	}
-	
+
 	/**
-	 * (Enum)
-	 * Default is American. If otherwise specified, returns odds in different format.
-	 * @param type FEED_ODDS_FORMAT_TYPE
+	 * To retrieve ONLY live games set the value to islive=1. If sportid is
+	 * provided along with the request, the result will be related to a single
+	 * sport. islive=0 cannot be used without the sportid parameter. This
+	 * ensures that the speed of the feed is not compromised. Sets isLive. This
+	 * is defined as Enum but just a simple boolean value.
 	 */
-	@Deprecated
-	public void oddsFormat (FEED_ODDS_FORMAT_TYPE type) {
-		this.parameters.put("oddsFormat", type.value());
+	public void isLive(boolean isLive) {
+		String boolean2 = isLive ? "1" : "0";
+		this.parameters.put("isLive", boolean2);
 	}
-	
+
 	/**
-	 * (Enum)
-	 * Bet is processed with this odds format.
-	 * @param type
+	 * Category of the special.
+	 * 
+	 * @param category
+	 * @throws PinnacleException
 	 */
-	public void oddsFormat (ODDS_FORMAT format) {
-		this.parameters.put("oddsFormat", format.name());
+	public void category(String category) throws PinnacleException {
+		if (category == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		category = this.urlEncode(category);
+		this.parameters.put("category", category);
 	}
-	
+
 	/**
-	 * (Long)
-	 * This is used to receive incremental updates. Use the value of feedTime 
-	 * from previous feed response. When last parameter is not provided, 
-	 * the response does not return the freshest lines. Please always use 
-	 * last parameter to get the freshest line changes. 
-	 * @param timestamp
+	 * Event id of the linked event
+	 * 
+	 * @param eventId
 	 */
-	@Deprecated
-	public void last (long timestamp) {
-		this.parameters.put("last", Long.valueOf(timestamp));
-		this.hasLast = true;
+	public void eventId(long eventId) {
+		this.parameters.put("eventId", eventId);
 	}
-	
+
 	/**
-	 * (BOOLEAN2)
-	 * To retrieve ONLY live games set the value to islive=1. If sportid is 
-	 * provided along with the request, the result will be related to 
-	 * a single sport. islive=0 cannot be used without the sportid parameter. 
-	 * This ensures that the speed of the feed is not compromised. Sets isLive. 
-	 * This is defined as Enum but just a simple boolean value.   
+	 * Specific special Id
+	 * 
+	 * @param specialId
 	 */
-	public void isLive (boolean isLive) {
-		this.parameters.put("isLive", Enums.boolean2(isLive));
+	public void specialId(long specialId) {
+		this.parameters.put("specialId", specialId);
 	}
-	
+
 	/**
-	 * (Enum)
-	 * To convert amounts (such as maximum bet amount) to another currency. 
-	 * If omitted, the default is United States Dollar (USD). 
-	 * The currency code should be one from the Get Currencies operation response.
-	 * @param currency
-	 * @throws IOException 
+	 * Format the odds are returned in.
+	 * 
+	 * @param oddsFormat
+	 * @throws PinnacleException 
 	 */
-	public void currencyCode (CURRENCY_CODE currencyCode) {
-		this.parameters.put("currencyCode", currencyCode.name());
-	}
-	
-	/**
-	 * (String)
-	 * This unique id of the place bet requests. This is to support idempotent requests.
-	 * @param uniqueRequestId
-	 */
-	public String uniqueRequestId () {
-		String uniqueId = UUID.randomUUID().toString();
-		this.parameters.put("uniqueRequestId", uniqueId);
-		return uniqueId;
-	}
-	
-	/**
-	 * (BOOLEAN1)
-	 * Whether or not to accept a bet when there is a line change in favor of the client.
-	 * @param acceptBetterLine
-	 */
-	public void acceptBetterLine (boolean acceptBetterLine) {
-		this.parameters.put("acceptBetterLine", Enums.boolean1(acceptBetterLine));
-	}
-	
-	/**
-	 * (String)
-	 * Reference to a customer in third party system.
-	 * @param customerReference
-	 */
-	public void customerReference (String customerReference) {
-		if (customerReference != null) {
-			this.parameters.put("customerReference", customerReference);
+	public void oddsFormat(ODDS_FORMAT oddsFormat) throws PinnacleException {
+		if (oddsFormat == null || oddsFormat == ODDS_FORMAT.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
 		}
+		this.parameters.put("oddsFormat", oddsFormat.toAPI());
 	}
-	
+
 	/**
-	 * (Decimal)
-	 * Wagered amount in Client’s currency.
-	 * @param amount
-	 */
-	public void stake (String stake) {
-		BigDecimal decimal = new BigDecimal(stake); // to validate
-		this.parameters.put("stake", decimal);
-	}
-	
-	/**
-	 * (Enum)
-	 * Whether the stake amount is risk or win amount.
-	 * @param type
-	 */
-	public void winRiskStake (WIN_RISK_TYPE type) {
-		this.parameters.put("winRiskStake", type.name());
-	}
-	
-	/**
-	 * (Integer)
-	 * This represents the period of the match.
+	 * This represents the period of the match. You can check the numbers by Get
+	 * Periods operation.
+	 * 
 	 * @param periodNumber
 	 */
-	public void periodNumber (int periodNumber) {
+	public void periodNumber(int periodNumber) {
 		this.parameters.put("periodNumber", Integer.valueOf(periodNumber));
 	}
 
 	/**
-	 * (Enum)
-	 * This represents the period of the match.
-	 * @param periodNumber
+	 * This represents the period of the match. Note that they may change the
+	 * definitions.
+	 * 
+	 * @param period
+	 * @throws PinnacleException 
 	 */
-	public void periodNumber (PERIOD periodNumber) {
-		this.parameters.put("periodNumber", periodNumber.value());
+	public void periodNumber(PERIOD period) throws PinnacleException {
+		if (period == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("periodNumber", period.toAPI());
 	}
 
-	
 	/**
-	 * (Enum)
-	 * The type of bet.
+	 * A bet type of four types.
+	 * 
 	 * @param type
+	 * @throws PinnacleException 
 	 */
-	public void betType (BET_TYPE type) {
-		this.parameters.put("betType", type);
+	public void betType(BET_TYPE type) throws PinnacleException {
+		if (type == null || type == BET_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("betType", type.toAPI());
 	}
-	
+
 	/**
-	 * (Enum)
-	 * Only SPREAD, MONEYLINE and TOTAL_POINTS are supported.
-	 * @param legBetType
-	 * @return
-	 */
-	public void legBetType (BET_TYPE legBetType) {
-		this.parameters.put("legBetType", legBetType);
-	}
-	
-	/**
-	 * (Enum)
-	 * Chosen team type. 
-	 * This is needed only for SPREAD, MONEYLINE and TEAM_TOTAL_POINTS bet types.
+	 * Chosen team type. This is needed only for SPREAD, MONEYLINE and
+	 * TEAM_TOTAL_POINTS bet types.
+	 * 
 	 * @param type
+	 * @throws PinnacleException 
 	 */
-	public void team (TEAM_TYPE type) {
-		this.parameters.put("team", type.name());
+	public void team(TEAM_TYPE type) throws PinnacleException {
+		if (type == null || type == TEAM_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("team", type.toAPI());
 	}
-	
+
 	/**
-	 * (Enum)
-	 * Chosen side. 
-	 * This is needed only for TOTAL_POINTS and TEAM_TOTAL_POINTS bet type.
+	 * Chosen side. This is needed only for TOTAL_POINTS and TEAM_TOTAL_POINTS
+	 * bet type.
+	 * 
 	 * @param type
+	 * @throws PinnacleException 
 	 */
-	public void side (SIDE_TYPE type) {
-		this.parameters.put("side", type.name());
+	public void side(SIDE_TYPE type) throws PinnacleException {
+		if (type == null || type == SIDE_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("side", type.toAPI());
 	}
-	
+
 	/**
-	 * (Integer)
-	 * Line identification.
-	 * @param id
-	 */
-	public void lineId (int id) {
-		this.parameters.put("lineId", Integer.valueOf(id));
-	}
-	
-	/**
-	 * (Integer)
-	 * Alternate line identification.
-	 * @param id
-	 */
-	public void altLineId (int id) {
-		this.parameters.put("altLineId", Integer.valueOf(id));
-	}
-	
-	/**
-	 * (BOOLEAN1)
-	 * Baseball only. Refers to the pitcher for TEAM_TYPE.Team1. 
-	 * This applicable only for MONEYLINE bet type, for all other bet types this has to be TRUE.
-	 * @param pitcher1MustStart
-	 */
-	public void pitcher1MustStart (boolean pitcher1MustStart) {
-		this.parameters.put("pitcher1MustStart", Enums.boolean1(pitcher1MustStart));
-	}
-	
-	/**
-	 * (BOOLEAN1)
-	 * Baseball only. Refers to the pitcher for TEAM_TYPE. Team2. 
-	 * This applicable only for MONEYLINE bet type, for all other bet types this has to be TRUE.
-	 * @param pitcher2MustStart
-	 */
-	public void pitcher2MustStart (boolean pitcher2MustStart) {
-		this.parameters.put("pitcher2MustStart", Enums.boolean1(pitcher2MustStart));
-	}
-	
-	/**
-	 * (Decimal)
-	 * Wagered amount in Client’s currency. It is always risk amount when placing Parlay bets.
-	 * NOTE: If round robin options is used this amount will apply for all parlays 
-	 * so actual amount wagered will be riskAmount X number of Parlays
-	 * @param amount
-	 * @return
-	 */
-	public void riskAmount (String amount) {
-		BigDecimal decimal = new BigDecimal(amount); // to validate
-		this.parameters.put("riskAmount", decimal);
-	}
-	
-	/**
-	 * (Array of Enum)
-	 * ARRAY of ROUND_ROBIN_OPTIONS. POST JSON request only.
-	 * @param roundRobinOptions
-	 * @return
-	 */
-	public void roundRobinOptions (ROUND_ROBIN_OPTIONS... roundRobinOptions) {
-		this.parameters.put("roundRobinOptions", Arrays.asList(roundRobinOptions));
-	}
-	
-	/**
-	 * (Array of Object)
-	 * Array of parlay legs. POST JSON request only.
-	 * @param legs
-	 * @return
-	 */
-	public void legs (Parameter... legs) {
-		this.legs = Arrays.asList(legs);
-	}
-	
-	/**
-	 * (String)
-	 * This unique id of the leg. It used to identify and match leg in the response.
-	 * @param uniqueLegId
-	 */
-	public String uniqueLegId () {
-		String uniqueId = UUID.randomUUID().toString();
-		this.parameters.put("uniqueLegId", uniqueId);
-		return uniqueId;
-	}
-	
-	/**
-	 * (Decimal)
-	 * This is needed for SPREAD, TOTAL_POINTS and TEAM_TOTAL_POINTS bet type.
+	 * Handicap value. This is needed for SPREAD, TOTAL_POINTS and
+	 * TEAM_TOTAL_POINTS bet type.
+	 * 
 	 * @param handicap
+	 * @throws PinnacleException 
 	 */
-	public void handicap (String handicap) {
+	public void handicap(String handicap) throws PinnacleException {
+		if (handicap == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
 		BigDecimal decimal = new BigDecimal(handicap); // to validate
 		this.parameters.put("handicap", decimal);
 	}
-	
+
 	/**
-	 * (Enum)
-	 * Not needed when betids is submitted.
-	 * @param type
-	 */
-	public void betlist (BETLIST_TYPE type) {
-		this.parameters.put("betlist", type.name());
-	}
-	
-	/**
-	 * (Array of Integer) 
-	 * Array of bet ids. When betids is submitted, no other parameter is necessary.
-	 * Maximum is 100 ids. 
-	 * Works for all non settled bets and all bets settled in the last 30 days.
+	 * Handicap value. This is needed for SPREAD, TOTAL_POINTS and
+	 * TEAM_TOTAL_POINTS bet type.
 	 * 
-	 * PinnacleSports.com requires this parameter as 'Int[]', but this function
-	 * deal it as a comma separated string because this is currently used 
-	 * for GET method, no use for POST method with parameters converted as JSON. 
-	 *  e.g. https://api.pinnaclesports.com/v1/bets?betids=299633842,299629993
-	 * @param ids
+	 * @param handicap
+	 * @throws PinnacleException 
 	 */
-	public void betIds (int... ids) {
-		String betIds = IntStream.of(ids)
-						.mapToObj(Integer::toString)
-						.collect(Collectors.joining(","));
+	public void handicap(BigDecimal handicap) throws PinnacleException {
+		if (handicap == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("handicap", handicap);
+	}
+
+	/**
+	 * Collection of legs.
+	 * 
+	 * @param legs
+	 * @throws PinnacleException 
+	 */
+	public void legs(Parameter... legs) throws PinnacleException {
+		if (this.hasNull((Object[]) legs)) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.legs = Arrays.asList(legs);
+	}
+
+	/**
+	 * Bet type for leg. Note that pinnacle don't use this name for legs in
+	 * getTeaserLines operation, which they implemented later.
+	 * 
+	 * @param legBetType
+	 * @throws PinnacleException 
+	 */
+	public void legBetType(LEG_BET_TYPE type) throws PinnacleException {
+		if (type == null || type == LEG_BET_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("legBetType", type.toAPI());
+	}
+
+	/**
+	 * This unique id of the leg. It used to identify and match leg in the
+	 * response.
+	 * 
+	 * @return random generated UUID
+	 */
+	public String uniqueLegId() {
+		String uuid = UUID.randomUUID().toString();
+		this.parameters.put("uniqueLegId", uuid);
+		return uuid;
+	}
+
+	/**
+	 * Client generated GUID for uniquely identifying the leg.
+	 * 
+	 * @return
+	 */
+	public String legId() {
+		String uuid = UUID.randomUUID().toString();
+		this.parameters.put("legId", uuid);
+		return uuid;
+	}
+
+	/**
+	 * Id of the contestant.
+	 * 
+	 * @param contestantId
+	 */
+	public void contestantId(long contestantId) {
+		this.parameters.put("contestantId", contestantId);
+	}
+
+	/**
+	 * This unique id of the place bet requests. This is to support idempotent
+	 * requests.
+	 */
+	public void uniqueRequestId() {
+		this.parameters.put("uniqueRequestId", UUID.randomUUID().toString());
+	}
+
+	/**
+	 * Whether or not to accept a bet when there is a line change in favor of
+	 * the client.
+	 * 
+	 * @param acceptBetterLine
+	 */
+	public void acceptBetterLine(boolean acceptBetterLine) {
+		this.parameters.put("acceptBetterLine", acceptBetterLine);
+	}
+
+	/**
+	 * Reference to a customer in third party system.
+	 * 
+	 * @param customerReference
+	 * @throws PinnacleException
+	 */
+	public void customerReference(String customerReference) throws PinnacleException {
+		if (customerReference == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		customerReference = this.urlEncode(customerReference);
+		this.parameters.put("customerReference", customerReference);
+	}
+
+	/**
+	 * Wagered amount in Client’s currency.
+	 * 
+	 * @param stake
+	 *            as String
+	 * @throws PinnacleException 
+	 */
+	public void stake(String stake) throws PinnacleException {
+		if (stake == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		BigDecimal decimal = new BigDecimal(stake); // to validate
+		this.parameters.put("stake", decimal);
+	}
+
+	/**
+	 * Alternate method of stake.
+	 * 
+	 * @param stake
+	 *            as BigDecimal
+	 * @throws PinnacleException 
+	 */
+	public void stake(BigDecimal stake) throws PinnacleException {
+		if (stake == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("stake", stake);
+	}
+
+	/**
+	 * Whether the stake amount is risk or win amount.
+	 * 
+	 * @param type
+	 * @throws PinnacleException 
+	 */
+	public void winRiskStake(WIN_RISK_TYPE type) throws PinnacleException {
+		if (type == null || type == WIN_RISK_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("winRiskStake", type.toAPI());
+	}
+
+	/**
+	 * Sets lineId as parameter.
+	 * 
+	 * @param lineId
+	 *            - Line identification.
+	 */
+	public void lineId(long lineId) {
+		this.parameters.put("lineId", lineId);
+	}
+
+	/**
+	 * Sets altLineId as parameter.
+	 * 
+	 * @param altLineId
+	 *            - Alternate line identification.
+	 */
+	public void altLineId(long altLineId) {
+		this.parameters.put("altLineId", altLineId);
+	}
+
+	/**
+	 * Sets pitcher1MustStart as parameter.
+	 * 
+	 * @param pitcher1MustStart
+	 *            - Baseball only. Refers to the pitcher for TEAM_TYPE.Team1.
+	 *            This applicable only for MONEYLINE bet type, for all other bet
+	 *            types this has to be TRUE
+	 */
+	public void pitcher1MustStart(boolean pitcher1MustStart) {
+		this.parameters.put("pitcher1MustStart", pitcher1MustStart);
+	}
+
+	/**
+	 * Sets pitcher2MustStart as parameter.
+	 * 
+	 * @param pitcher2MustStart
+	 *            - Baseball only. Refers to the pitcher for TEAM_TYPE. Team2.
+	 *            This applicable only for MONEYLINE bet type, for all other bet
+	 *            types this has to be TRUE
+	 */
+	public void pitcher2MustStart(boolean pitcher2MustStart) {
+		this.parameters.put("pitcher2MustStart", pitcher2MustStart);
+	}
+
+	/**
+	 * Wagered amount in Client’s currency. It is always risk amount when
+	 * placing Parlay bets. NOTE: If round robin options is used this amount
+	 * will apply for all parlays so actual amount wagered will be riskAmount X
+	 * number of Parlays
+	 * 
+	 * @param riskAmount
+	 * @throws PinnacleException 
+	 */
+	public void riskAmount(String riskAmount) throws PinnacleException {
+		if (riskAmount == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("riskAmount", new BigDecimal(riskAmount));
+	}
+
+	/**
+	 * Alternate method of riskAmount.
+	 * 
+	 * @param riskAmount
+	 * @throws PinnacleException 
+	 */
+	public void riskAmount(BigDecimal riskAmount) throws PinnacleException {
+		if (riskAmount == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("riskAmount", riskAmount);
+	}
+
+	/**
+	 * ARRAY of ROUND_ROBIN_OPTIONS
+	 * 
+	 * @param roundRobinOptions
+	 * @throws PinnacleException 
+	 */
+	public void roundRobinOptions(ROUND_ROBIN_OPTIONS... roundRobinOptions) throws PinnacleException {
+		if (this.hasNull((Object[]) roundRobinOptions)) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		}
+		this.parameters.put("roundRobinOptions", 
+				Stream.of(roundRobinOptions)
+					.filter(rr -> rr != ROUND_ROBIN_OPTIONS.UNDEFINED)
+					.map(ROUND_ROBIN_OPTIONS::toAPI)
+					.collect(Collectors.toList()));
+	}
+
+	/**
+	 * Unique identifier. Teaser details can be retrieved from a call to Get
+	 * Teaser Groups endpoint.
+	 * 
+	 * @param teaserId
+	 */
+	public void teaserId(long teaserId) {
+		this.parameters.put("teaserId", teaserId);
+	}
+
+	/**
+	 * A list of special bets
+	 * @throws PinnacleException 
+	 */
+	public void bets(Parameter... bets) throws PinnacleException {
+		if (this.hasNull((Object[]) bets)) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.bets = Arrays.asList(bets);
+	}
+
+	/**
+	 * Not needed when betids is submitted.
+	 * 
+	 * @param betlist
+	 * @throws PinnacleException 
+	 */
+	public void betlist(BETLIST_TYPE betlist) throws PinnacleException {
+		if (betlist == null || betlist == BETLIST_TYPE.UNDEFINED) {
+			throw PinnacleException.parameterInvalid("Parameter cannot accept null or UNDEFINED.");
+		}
+		this.parameters.put("betlist", betlist.toAPI());
+	}
+
+	/**
+	 * Array of bet ids. When betids is submitted, no other parameter is
+	 * necessary. Maximum is 100 ids. Works for all non settled bets and all
+	 * bets settled in the last 30 days
+	 * 
+	 * @param ids
+	 * @throws PinnacleException
+	 */
+	public void betids(long... ids) throws PinnacleException {
+		if (ids.length > 100) {
+			throw PinnacleException.parameterInvalid("Number of 'betids' exceeds 100 as its maximum.");
+		}
+		String betIds = LongStream.of(ids).mapToObj(Long::toString).collect(Collectors.joining(","));
 		this.parameters.put("betids", betIds);
 	}
-	
+
 	/**
-	 * (DateTime)
-	 * Start date of the requested period. Required when betlist parameter is submitted.
-	 * Difference between fromDate and toDdate can’t be more than 30 days.
+	 * Start date of the requested period. Required when betlist parameter is
+	 * submitted. Difference between fromDate and toDdate can’t be more than 30
+	 * days. Expected format is ISO8601 - can be set to just date or date and
+	 * time.
+	 * @throws PinnacleException 
+	 */
+	public void fromDate(LocalDateTime fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("fromDate", fromDate.toString() + "Z"); // Z means
+																	// UTC
+	}
+
+	/**
+	 * Alternate method. Time will be set as 00:00:00.
+	 * 
 	 * @param fromDate
+	 * @throws PinnacleException 
 	 */
-	public void fromDate (LocalDate fromDate) {
-		this.parameters.put("fromDate", fromDate); // YYYY-MM-DD
+	public void fromDate(LocalDate fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		LocalTime fromTime = LocalTime.of(0, 0, 0);
+		this.fromDate(LocalDateTime.of(fromDate, fromTime));
 	}
 
 	/**
-	 * (DateTime)
-	 * End date of the requested period Required when betlist parameter is submitted.
-	 * @param toDate
+	 * Alternate method. ZonedDateTime.toString returns like
+	 * "2016-12-02T23:59:59Z[UTC]" but Pinnacle API doesn't accept last square
+	 * brackets so needs to convert to LocalDateTime.
+	 * 
+	 * @param fromDate
+	 * @throws PinnacleException 
 	 */
-	public void toDate (LocalDate toDate) {
-		this.parameters.put("toDate", toDate); // YYYY-MM-DD
-	}
-	
-	/**
-	 * (String)
-	 * Must be in "Language Culture Name" format.
-	 * @param languages
-	 * @return
-	 */
-	public void cultureCodes (LANGUAGE... languages) {
-		String codes = Stream.of(languages)
-				.map(LANGUAGE::code)
-				.collect(Collectors.joining("|"));
-		this.parameters.put("cultureCodes", codes);
+	public void fromDate(ZonedDateTime fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		ZonedDateTime utc = fromDate.withZoneSameInstant(Constants.TIME_ZONE);
+		this.fromDate(utc.toLocalDateTime());
 	}
 
 	/**
-	 * (String)
-	 * Array of strings to be translated.
-	 * @param baseTexts
-	 * @return
+	 * End date of the requested period Required when betlist parameter is
+	 * submitted. Expected format is ISO8601 - can be set to just date or date
+	 * and time. toDate value is exclusive, meaning it cannot be equal to
+	 * fromDate
+	 * @throws PinnacleException 
 	 */
-	public void baseTexts (String... baseTexts) {
-		String combined = Stream.of(baseTexts)
-				.collect(Collectors.joining("|"));
+	public void toDate(LocalDateTime fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		this.parameters.put("toDate", fromDate.toString() + "Z"); // Z means UTC
+	}
+
+	/**
+	 * Alternate method. Time will be set as 23:59:59.
+	 * 
+	 * @param fromDate
+	 * @throws PinnacleException 
+	 */
+	public void toDate(LocalDate fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		LocalTime fromTime = LocalTime.of(23, 59, 59);
+		this.toDate(LocalDateTime.of(fromDate, fromTime));
+	}
+
+	/**
+	 * Alternate method. ZonedDateTime.toString returns like
+	 * "2016-12-02T23:59:59Z[UTC]" but Pinnacle API doesn't accept last square
+	 * brackets so needs to convert to LocalDateTime.
+	 * 
+	 * @param fromDate
+	 * @throws PinnacleException 
+	 */
+	public void toDate(ZonedDateTime fromDate) throws PinnacleException {
+		if (fromDate == null) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		ZonedDateTime utc = fromDate.withZoneSameInstant(Constants.TIME_ZONE);
+		this.toDate(utc.toLocalDateTime());
+	}
+
+	public void cultureCodes(CULTURE_CODE... codes) throws PinnacleException {
+		if (this.hasNull((Object[]) codes)) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		String combined = Stream.of(codes).map(CULTURE_CODE::toAPI).collect(Collectors.joining("|"));
+		this.parameters.put("cultureCodes", combined);
+	}
+
+	public void baseTexts(String... baseTexts) throws PinnacleException {
+		if (this.hasNull((Object[]) baseTexts)) throw PinnacleException.parameterInvalid("Parameter cannot accept null.");
+		List<String> encodedTexts = new ArrayList<>();
+		for (String text : baseTexts) {
+			String encoded = this.urlEncode(text);
+			encodedTexts.add(encoded);
+		}
+		String combined = encodedTexts.stream().collect(Collectors.joining("|"));
 		this.parameters.put("baseTexts", combined);
 	}
+	
 }
