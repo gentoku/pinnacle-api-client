@@ -36,7 +36,7 @@ public class PinnacleAPI {
 	/**
 	 * Base64 value of UTF-8 encoded "username:password" for authentication.
 	 */
-	private String credentials;
+	private final String credentials;
 
 	/**
 	 * Constructor with credentials.
