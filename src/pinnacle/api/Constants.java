@@ -7,7 +7,7 @@ public class Constants {
 	/**
 	 * Base URL for Pinnacle API.
 	 */
-	static final String BASE_URL = "https://api.pinnaclesports.com";
+	static final String BASE_URL = "https://api.pinnacle.com";
 
 	/**
 	 * Time zone used by Pinnacle API. All dates and times are in UTC time zone,
